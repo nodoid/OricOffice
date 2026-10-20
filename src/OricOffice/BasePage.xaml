@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="OricOffice.BasePage"
+    x:DataType="vm:BaseViewModel"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:OricOffice.Core.ViewModels;assembly=OricOffice.Core"
+    xmlns:shared="clr-namespace:OricOffice.MauiShared.Controls;assembly=OricOffice.MauiShared"
+    Title="{Binding Title}">
+
+    <Grid
+        RowDefinitions="Auto,Auto,Auto,Auto,1*,Auto"
+        RowSpacing="0"
+        BackgroundColor="{StaticResource Suite.ChromeBrush}">
+
+        <!-- Menu bar -->
+        <shared:SuiteMenuBarView x:Name="CustomMenuBar" Grid.Row="0" ItemsSource="{Binding Menus}" />
+
+        <!-- Toolbar -->
+        <shared:SuiteToolBarView Grid.Row="1" ItemsSource="{Binding Toolbar}" />
+
+        <!-- Query + sort bar -->
+        <Grid
+            Grid.Row="2"
+            ColumnDefinitions="1*,Auto,Auto,Auto,Auto,Auto,Auto"
+            ColumnSpacing="6"
+            Padding="10,7"
+            BackgroundColor="{StaticResource Suite.ChromeBrush}">
+            <Entry
+                Grid.Column="0"
+                Completed="OnQueryCompleted"
+                Placeholder='filter, e.g.  name contains "smith" AND age >= 21'
+                Style="{StaticResource Suite.BarEntry}"
+                Text="{Binding QueryText, Mode=TwoWay}" />
+            <Button
+                Grid.Column="1"
+                Command="{Binding ApplyQueryCommand}"
+                Style="{StaticResource Suite.SmallButton}"
+                Text="Apply filter" />
+            <Button
+                Grid.Column="2"
+                Command="{Binding ClearQueryCommand}"
+                Style="{StaticResource Suite.SmallButton}"
+                Text="Clear" />
+            <Label
+                Grid.Column="3"
+                FontSize="12"
+                Text="Sort by"
+                TextColor="{StaticResource Suite.TextSecondaryBrush}"
+                VerticalOptions="Center" />
+            <Picker
+                Grid.Column="4"
+                HeightRequest="30"
+                FontSize="13"
+                ItemsSource="{Binding FieldNames}"
+                SelectedItem="{Binding SortFieldName, Mode=TwoWay}"
+                Title="Field"
+                VerticalOptions="Center"
+                WidthRequest="132" />
+            <Button
+                Grid.Column="5"
+                Command="{Binding SortAscendingCommand}"
+                Style="{StaticResource Suite.SmallButton}"
+                Text="A→Z" />
+            <Button
+                Grid.Column="6"
+                Command="{Binding SortDescendingCommand}"
+                Style="{StaticResource Suite.SmallButton}"
+                Text="Z→A" />
+        </Grid>
+
+        <!-- Field chips strip -->
+        <Grid
+            Grid.Row="3"
+            ColumnDefinitions="1*,Auto"
+            ColumnSpacing="8"
+            Padding="10,4,10,8"
+            BackgroundColor="{StaticResource Suite.ChromeBrush}">
+            <CollectionView
+                Grid.Column="0"
+                HeightRequest="44"
+                ItemsSource="{Binding Fields}"
+                SelectionMode="None">
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Horizontal" ItemSpacing="6" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FieldViewModel">
+                        <Border
+                            Padding="6,3"
+                            BackgroundColor="White"
+                            Stroke="{StaticResource Suite.GridLineBrush}"
+                            StrokeShape="RoundRectangle 6"
+                            StrokeThickness="1">
+                            <HorizontalStackLayout Spacing="4">
+                                <Entry
+                                    BackgroundColor="Transparent"
+                                    FontSize="13"
+                                    HeightRequest="28"
+                                    Text="{Binding Name, Mode=TwoWay}"
+                                    WidthRequest="104" />
+                                <Button
+                                    BackgroundColor="#ECECEC"
+                                    BorderWidth="0"
+                                    Command="{Binding ToggleTypeCommand}"
+                                    CornerRadius="4"
+                                    FontSize="11"
+                                    HeightRequest="26"
+                                    Padding="7,2"
+                                    Text="{Binding TypeLabel}"
+                                    TextColor="#3A3A3A" />
+                                <Button
+                                    BackgroundColor="Transparent"
+                                    BorderWidth="0"
+                                    Command="{Binding DeleteCommand}"
+                                    CornerRadius="4"
+                                    FontSize="13"
+                                    HeightRequest="26"
+                                    Padding="6,2"
+                                    Text="×"
+                                    TextColor="#8A8A8A" />
+                            </HorizontalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+                <CollectionView.EmptyView>
+                    <Label Padding="2,10" Style="{StaticResource Suite.Hint}" Text="No fields yet — press “+ Field”." />
+                </CollectionView.EmptyView>
+            </CollectionView>
+
+            <Button
+                Grid.Column="1"
+                Command="{Binding AddFieldCommand}"
+                HeightRequest="34"
+                Style="{StaticResource Suite.SmallButton}"
+                Text="+ Field" />
+        </Grid>
+
+        <!-- Records list | record editor -->
+        <Grid
+            Grid.Row="4"
+            ColumnDefinitions="0.45*,0.55*"
+            ColumnSpacing="10"
+            Padding="10,0,10,10"
+            BackgroundColor="{StaticResource Suite.CanvasBrush}">
+
+            <!-- Record list -->
+            <Border
+                BackgroundColor="White"
+                Padding="0"
+                Stroke="{StaticResource Suite.GridLineBrush}"
+                StrokeShape="RoundRectangle 4"
+                StrokeThickness="1">
+                <CollectionView
+                    ItemsSource="{Binding Records}"
+                    SelectedItem="{Binding SelectedRecord, Mode=TwoWay}"
+                    SelectionMode="Single">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:RecordViewModel">
+                            <Label
+                                Padding="14,10"
+                                FontFamily="OpenSansRegular"
+                                FontSize="14"
+                                LineBreakMode="TailTruncation"
+                                Text="{Binding ListLabel}"
+                                TextColor="{StaticResource Suite.TextBrush}" />
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                    <CollectionView.EmptyView>
+                        <Label
+                            Padding="16,16"
+                            Style="{StaticResource Suite.Hint}"
+                            Text="No records yet — press New Record in the toolbar." />
+                    </CollectionView.EmptyView>
+                </CollectionView>
+            </Border>
+
+            <!-- Record editor -->
+            <Border
+                BackgroundColor="White"
+                Padding="0"
+                Stroke="{StaticResource Suite.GridLineBrush}"
+                StrokeShape="RoundRectangle 4"
+                StrokeThickness="1">
+                <Grid RowDefinitions="Auto,1*" RowSpacing="0">
+                    <Label
+                        Grid.Row="0"
+                        Margin="16,12,16,4"
+                        IsVisible="{Binding HasSelectedRecord}"
+                        Style="{StaticResource Suite.SectionTitle}"
+                        Text="{Binding SelectedRecord.Headline}" />
+                    <Label
+                        Grid.Row="0"
+                        Margin="16,12,16,4"
+                        IsVisible="{Binding NoRecordSelected}"
+                        Style="{StaticResource Suite.Hint}"
+                        Text="Select or create a record to edit it here." />
+                    <CollectionView Grid.Row="1" ItemsSource="{Binding SelectedRecord.Cells}" SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RecordCellViewModel">
+                                <StackLayout Padding="16,7,16,0" Spacing="0">
+                                    <Label Style="{StaticResource Suite.FieldLabel}" Text="{Binding FieldName}" />
+                                    <Border
+                                        Padding="0"
+                                        BackgroundColor="White"
+                                        Stroke="{StaticResource Suite.GridLineBrush}"
+                                        StrokeShape="RoundRectangle 4"
+                                        StrokeThickness="1">
+                                        <Entry
+                                            BackgroundColor="Transparent"
+                                            FontSize="14"
+                                            HeightRequest="32"
+                                            Text="{Binding Value, Mode=TwoWay}" />
+                                    </Border>
+                                </StackLayout>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                        <CollectionView.EmptyView>
+                            <Label
+                                Padding="16,16"
+                                Style="{StaticResource Suite.Hint}"
+                                Text="Add a field above to start entering data." />
+                        </CollectionView.EmptyView>
+                    </CollectionView>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status bar -->
+        <Label
+            Grid.Row="5"
+            Style="{StaticResource Suite.StatusBar}"
+            Text="{Binding StatusText}" />
+    </Grid>
+</ContentPage>

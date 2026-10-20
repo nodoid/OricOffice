@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="OricOffice.AuthorPage"
+    x:DataType="vm:AuthorViewModel"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:OricOffice.Core.ViewModels;assembly=OricOffice.Core"
+    xmlns:shared="clr-namespace:OricOffice.MauiShared.Controls;assembly=OricOffice.MauiShared"
+    Title="{Binding Title}">
+
+    <Grid
+        RowDefinitions="Auto,Auto,1*,Auto"
+        RowSpacing="0"
+        BackgroundColor="{StaticResource Suite.ChromeBrush}">
+
+        <!-- Menu bar: native on Windows/macOS (hidden here), tap-to-open row on tablets -->
+        <shared:SuiteMenuBarView x:Name="CustomMenuBar" Grid.Row="0" ItemsSource="{Binding Menus}" />
+
+        <!-- Toolbar -->
+        <shared:SuiteToolBarView Grid.Row="1" ItemsSource="{Binding Toolbar}" />
+
+        <!-- Document area: a page on a neutral canvas, LibreOffice-style -->
+        <Grid Grid.Row="2" Padding="20,14" BackgroundColor="{StaticResource Suite.CanvasBrush}">
+            <Border
+                x:Name="DocumentBorder"
+                HorizontalOptions="Center"
+                VerticalOptions="Fill"
+                WidthRequest="940" MaximumWidthRequest="940"
+                BackgroundColor="White"
+                Padding="0"
+                Stroke="{StaticResource Suite.GridLineBrush}"
+                StrokeShape="RoundRectangle 6"
+                StrokeThickness="1">
+                <Grid Margin="44,34">
+                    <Editor
+                        x:Name="BodyEditor"
+                        AutoSize="Disabled"
+                        BackgroundColor="Transparent"
+                        CursorPosition="{Binding CursorPosition, Mode=TwoWay}"
+                        FontFamily="OpenSansRegular"
+                        FontSize="{Binding DocumentFontSize}"
+                        Placeholder="Start typing…"
+                        PlaceholderColor="#B0B0B0"
+                        SelectionLength="{Binding SelectionLength, Mode=TwoWay}"
+                        Text="{Binding Body, Mode=TwoWay}"
+                        TextColor="#1A1A1A" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status bar with live word count -->
+        <Label
+            Grid.Row="3"
+            Style="{StaticResource Suite.StatusBar}"
+            Text="{Binding StatusText}" />
+    </Grid>
+</ContentPage>

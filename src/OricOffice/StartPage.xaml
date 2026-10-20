@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="OricOffice.StartPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:shared="clr-namespace:OricOffice.MauiShared.Controls;assembly=OricOffice.MauiShared"
+    Title="">
+
+    <Grid
+        RowDefinitions="Auto,1*,Auto"
+        RowSpacing="0"
+        BackgroundColor="{StaticResource Suite.CanvasBrush}">
+
+        <!-- Menu row: native menu bar on desktop (hidden here), tap-to-open on tablets -->
+        <shared:SuiteMenuBarView x:Name="CustomMenuBar" Grid.Row="0" ItemsSource="{Binding Menus}" />
+
+        <!-- Start center: pick an application -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="40,48" Spacing="10" VerticalOptions="Center">
+
+                <Label
+                    HorizontalOptions="Center"
+                    FontFamily="OpenSansSemibold"
+                    FontSize="30"
+                    Text="Oric Office"
+                    TextColor="{StaticResource Suite.TextBrush}" />
+
+                <Label
+                    Margin="0,0,0,34"
+                    HorizontalOptions="Center"
+                    Style="{StaticResource Suite.Hint}"
+                    Text="Choose an application to start" />
+
+                <HorizontalStackLayout HorizontalOptions="Center" Spacing="28">
+
+                    <!-- Author -->
+                    <Border
+                        Padding="26,30"
+                        BackgroundColor="{StaticResource Suite.SurfaceBrush}"
+                        Stroke="{StaticResource Suite.GridLineBrush}"
+                        StrokeShape="RoundRectangle 12"
+                        StrokeThickness="1"
+                        WidthRequest="224"
+                        HeightRequest="268">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnOpenAuthor" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="14" VerticalOptions="Center">
+                            <Image
+                                HeightRequest="104"
+                                Source="author.png"
+                                VerticalOptions="Center" />
+                            <Label
+                                HorizontalOptions="Center"
+                                FontFamily="OpenSansSemibold"
+                                FontSize="17"
+                                Text="Author" />
+                            <Label
+                                HorizontalOptions="Center"
+                                HorizontalTextAlignment="Center"
+                                Style="{StaticResource Suite.Hint}"
+                                Text="Word processor&#10;for documents" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Calc -->
+                    <Border
+                        Padding="26,30"
+                        BackgroundColor="{StaticResource Suite.SurfaceBrush}"
+                        Stroke="{StaticResource Suite.GridLineBrush}"
+                        StrokeShape="RoundRectangle 12"
+                        StrokeThickness="1"
+                        WidthRequest="224"
+                        HeightRequest="268">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnOpenCalc" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="14" VerticalOptions="Center">
+                            <Image
+                                HeightRequest="104"
+                                Source="calc.png"
+                                VerticalOptions="Center" />
+                            <Label
+                                HorizontalOptions="Center"
+                                FontFamily="OpenSansSemibold"
+                                FontSize="17"
+                                Text="Calc" />
+                            <Label
+                                HorizontalOptions="Center"
+                                HorizontalTextAlignment="Center"
+                                Style="{StaticResource Suite.Hint}"
+                                Text="Spreadsheet&#10;with formulas" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Base -->
+                    <Border
+                        Padding="26,30"
+                        BackgroundColor="{StaticResource Suite.SurfaceBrush}"
+                        Stroke="{StaticResource Suite.GridLineBrush}"
+                        StrokeShape="RoundRectangle 12"
+                        StrokeThickness="1"
+                        WidthRequest="224"
+                        HeightRequest="268">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnOpenBase" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="14" VerticalOptions="Center">
+                            <Image
+                                HeightRequest="104"
+                                Source="base.png"
+                                VerticalOptions="Center" />
+                            <Label
+                                HorizontalOptions="Center"
+                                FontFamily="OpenSansSemibold"
+                                FontSize="17"
+                                Text="Base" />
+                            <Label
+                                HorizontalOptions="Center"
+                                HorizontalTextAlignment="Center"
+                                Style="{StaticResource Suite.Hint}"
+                                Text="Database&#10;for records" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Status bar -->
+        <Label
+            Grid.Row="2"
+            Style="{StaticResource Suite.StatusBar}"
+            Text="Oric Office 1.0 · Licensed under DILLIGAF · © Paul F. Johnson" />
+    </Grid>
+</ContentPage>

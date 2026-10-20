@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="OricOffice.CalcPage"
+    x:DataType="vm:CalcViewModel"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:OricOffice.Core.ViewModels;assembly=OricOffice.Core"
+    xmlns:shared="clr-namespace:OricOffice.MauiShared.Controls;assembly=OricOffice.MauiShared"
+    Title="{Binding Title}">
+
+    <Grid
+        RowDefinitions="Auto,Auto,Auto,1*,Auto"
+        RowSpacing="0"
+        BackgroundColor="{StaticResource Suite.ChromeBrush}">
+
+        <!-- Menu bar -->
+        <shared:SuiteMenuBarView x:Name="CustomMenuBar" Grid.Row="0" ItemsSource="{Binding Menus}" />
+
+        <!-- Toolbar -->
+        <shared:SuiteToolBarView Grid.Row="1" ItemsSource="{Binding Toolbar}" />
+
+        <!-- Formula bar: name box | fx | formula | apply -->
+        <Grid
+            Grid.Row="2"
+            ColumnDefinitions="Auto,Auto,1*,Auto"
+            ColumnSpacing="8"
+            Padding="10,7"
+            BackgroundColor="{StaticResource Suite.ChromeBrush}">
+            <Entry
+                Grid.Column="0"
+                WidthRequest="92"
+                Completed="OnNameBoxCompleted"
+                Style="{StaticResource Suite.BarEntry}"
+                Text="{Binding NameBoxText, Mode=TwoWay}" />
+            <Label
+                Grid.Column="1"
+                FontFamily="OpenSansSemibold"
+                FontSize="14"
+                Text="ƒx"
+                TextColor="{StaticResource Suite.TextSecondaryBrush}"
+                VerticalOptions="Center" />
+            <Entry
+                Grid.Column="2"
+                x:Name="FormulaEntry"
+                Completed="OnFormulaCommitted"
+                Placeholder="value or =formula (e.g. =SUM(A1:A5))"
+                Style="{StaticResource Suite.BarEntry}"
+                Text="{Binding FormulaBarText, Mode=TwoWay}" />
+            <Button
+                Grid.Column="3"
+                Command="{Binding CommitFormulaCommand}"
+                Style="{StaticResource Suite.SmallButton}"
+                Text="Apply" />
+        </Grid>
+
+        <!-- Spreadsheet grid (built in code-behind from the view model) -->
+        <Border
+            Grid.Row="3"
+            Margin="10,0,10,8"
+            BackgroundColor="White"
+            Padding="0"
+            Stroke="{StaticResource Suite.GridLineBrush}"
+            StrokeShape="RoundRectangle 4"
+            StrokeThickness="1">
+            <ScrollView x:Name="GridScroller" Orientation="Both">
+                <VerticalStackLayout x:Name="GridContainer" Padding="10,8" Spacing="0" />
+            </ScrollView>
+        </Border>
+
+        <!-- Status bar -->
+        <Label
+            Grid.Row="4"
+            Style="{StaticResource Suite.StatusBar}"
+            Text="{Binding StatusText}" />
+    </Grid>
+</ContentPage>

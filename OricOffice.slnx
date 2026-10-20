@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OricOffice/OricOffice.csproj" />
+    <Project Path="src/OricOffice.Core/OricOffice.Core.csproj" />
+    <Project Path="src/OricOffice.MauiShared/OricOffice.MauiShared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OricOffice.Core.Tests/OricOffice.Core.Tests.csproj" />
+  </Folder>
+</Solution>
