@@ -10,7 +10,9 @@ public class BaseViewModelTests : IDisposable
     private readonly TempDir _dir = new();
     private readonly FakeDialogs _dialogs = new();
     private readonly FakeLifetime _lifetime = new();
-    private readonly OricFileStore _store = new();
+    private readonly OricFileStore _store;
+
+    public BaseViewModelTests() => _store = new OricFileStore(_dir.Path); // rooted: drafts/recents stay in the test dir
 
     public void Dispose() => _dir.Dispose();
 
@@ -210,7 +212,7 @@ public class BaseViewModelTests : IDisposable
     public void MenusAndToolbar_AreBuilt()
     {
         var vm = Create();
-        Assert.Equal(new[] { "File", "Table", "Record", "Query", "Help" }, vm.Menus.Select(m => m.Header));
+        Assert.Equal(new[] { "Home", "File", "Table", "Record", "Query", "Help" }, vm.Menus.Select(m => m.Header));
         Assert.Contains(vm.Toolbar, b => b.Text == "New Record");
         Assert.Contains(vm.Toolbar, b => b.Text == "+ Field");
     }

@@ -87,7 +87,36 @@ public static class SuiteMenuBar
             item.Command = model.Command;
         else if (model.Action is not null)
             item.Clicked += (_, _) => model.Action();
+#if WINDOWS
+        if (!string.IsNullOrEmpty(model.Accelerator))
+            ApplyAccelerator(item, model.Accelerator!);
+#endif
         return item;
     }
+
+#if WINDOWS
+    /// <summary>Wires a "Ctrl+P"-style shortcut onto the native menu item.</summary>
+    private static void ApplyAccelerator(MenuFlyoutItem item, string accelerator)
+    {
+        var parts = accelerator.Split('+');
+        var modifiers = KeyboardAcceleratorModifiers.None;
+        foreach (var part in parts[..^1])
+        {
+            modifiers |= part.Trim().ToUpperInvariant() switch
+            {
+                "CTRL" or "CONTROL" => KeyboardAcceleratorModifiers.Ctrl,
+                "SHIFT" => KeyboardAcceleratorModifiers.Shift,
+                "ALT" => KeyboardAcceleratorModifiers.Alt,
+                _ => KeyboardAcceleratorModifiers.None,
+            };
+        }
+
+        item.KeyboardAccelerators.Add(new KeyboardAccelerator
+        {
+            Key = parts[^1].Trim(),
+            Modifiers = modifiers,
+        });
+    }
+#endif
 #endif
 }

@@ -16,6 +16,58 @@ public sealed class OricFileStore
 {
     private const string SqliteHeader = "SQLite format 3\0";
 
+    /// <summary>Root for drafts and the recents list (private app data; overridable for tests).</summary>
+    private readonly string _dataRoot;
+
+    public OricFileStore(string? dataRoot = null)
+        => _dataRoot = dataRoot ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OricOffice");
+
+    // ---------------------------------------------------------------- drafts
+
+    /// <summary>
+    /// Single-slot draft path for a module: the working copy kept when the user
+    /// leaves with unsaved changes, restored on the next start.
+    /// </summary>
+    public string DraftPath(OricFileKind kind)
+        => Path.Combine(_dataRoot, "drafts", kind.For().TrimStart('.'), "draft" + kind.For());
+
+    public bool DraftExists(OricFileKind kind) => File.Exists(DraftPath(kind));
+
+    public void DeleteDraft(OricFileKind kind)
+    {
+        var path = DraftPath(kind);
+        if (File.Exists(path)) File.Delete(path);
+    }
+
+    // ---------------------------------------------------------------- recents
+
+    private string RecentsPath => Path.Combine(_dataRoot, "recents.json");
+
+    /// <summary>Loads the recent-documents list; a missing or corrupt file yields an empty list.</summary>
+    public List<RecentDocumentEntry> LoadRecents()
+    {
+        try
+        {
+            if (!File.Exists(RecentsPath)) return new List<RecentDocumentEntry>();
+            var entries = JsonSerializer.Deserialize<List<RecentDocumentEntry>>(
+                File.ReadAllText(RecentsPath));
+            return entries is null ? new List<RecentDocumentEntry>() : entries;
+        }
+        catch
+        {
+            return new List<RecentDocumentEntry>();
+        }
+    }
+
+    public void SaveRecents(IReadOnlyList<RecentDocumentEntry> entries)
+    {
+        var directory = Path.GetDirectoryName(RecentsPath);
+        if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+        File.WriteAllText(RecentsPath, JsonSerializer.Serialize(entries,
+            new JsonSerializerOptions { WriteIndented = true }));
+    }
+
     private const string SchemaSql = """
         PRAGMA user_version = 1;
 
@@ -66,6 +118,47 @@ public sealed class OricFileStore
         );
 
         CREATE INDEX IF NOT EXISTS ix_records_tbl ON records (tbl_id, ord);
+
+        CREATE TABLE IF NOT EXISTS doc_images (
+            doc_id INTEGER NOT NULL,
+            ord    INTEGER NOT NULL,
+            name   TEXT    NOT NULL,
+            data   BLOB    NOT NULL,
+            PRIMARY KEY (doc_id, ord)
+        );
+
+        CREATE TABLE IF NOT EXISTS doc_tables (
+            doc_id INTEGER NOT NULL,
+            ord    INTEGER NOT NULL,
+            name   TEXT    NOT NULL,
+            rows   INTEGER NOT NULL,
+            cols   INTEGER NOT NULL,
+            data   TEXT    NOT NULL,
+            PRIMARY KEY (doc_id, ord)
+        );
+
+        CREATE TABLE IF NOT EXISTS sheet_images (
+            sheet_id   INTEGER NOT NULL,
+            ord        INTEGER NOT NULL,
+            name       TEXT    NOT NULL,
+            anchor_row INTEGER NOT NULL,
+            anchor_col INTEGER NOT NULL,
+            off_x      INTEGER NOT NULL,
+            off_y      INTEGER NOT NULL,
+            width      INTEGER NOT NULL,
+            height     INTEGER NOT NULL,
+            data       BLOB    NOT NULL,
+            PRIMARY KEY (sheet_id, ord)
+        );
+
+        CREATE TABLE IF NOT EXISTS doc_runs (
+            doc_id INTEGER NOT NULL,
+            ord    INTEGER NOT NULL,
+            start  INTEGER NOT NULL,
+            len    INTEGER NOT NULL,
+            style  TEXT    NOT NULL,
+            PRIMARY KEY (doc_id, ord)
+        );
         """;
 
     public IReadOnlyList<string> SupportedExtensions => OricFileExtensions.All;
@@ -175,6 +268,68 @@ public sealed class OricFileStore
                 file.Text.Body = body is string s ? s : string.Empty;
             }
 
+            // Style runs come after the body: the Body setter repairs offsets.
+            if (TableExists(connection, "doc_runs"))
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT start, len, style FROM doc_runs WHERE doc_id = 1 ORDER BY ord";
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        TextStyle? style;
+                        try
+                        {
+                            style = JsonSerializer.Deserialize<TextStyle>(reader.GetString(2));
+                        }
+                        catch (JsonException)
+                        {
+                            continue; // unreadable style never blocks the document
+                        }
+                        var run = new TextRun(reader.GetInt32(0), reader.GetInt32(1), style ?? new TextStyle());
+                        if (run.Start >= 0 && run.Length > 0 && run.End <= file.Text.Body.Length)
+                            file.Text.Runs.Add(run);
+                    }
+                }
+                file.Text.Normalize();
+            }
+
+            if (TableExists(connection, "doc_images"))
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT name, data FROM doc_images WHERE doc_id = 1 ORDER BY ord";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    file.Text.Images.Add(new DocumentImage(reader.GetString(0), (byte[])reader[1]));
+            }
+
+            if (TableExists(connection, "doc_tables"))
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT name, data FROM doc_tables WHERE doc_id = 1 ORDER BY ord";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var block = new TableBlock();
+                    var payload = JsonSerializer.Deserialize<TablePayload>(reader.GetString(1));
+                    if (payload?.Text is not null)
+                        block.Restore(payload.Text, payload.Fill, reader.GetString(0));
+                    else
+                        block.Name = reader.GetString(0);
+
+                    if (payload?.Borders is not null)
+                    {
+                        var borders = new Dictionary<(int Row, int Column, BorderSide Side), CellBorder>();
+                        foreach (var b in payload.Borders)
+                            borders[(b.Row, b.Column, (BorderSide)b.Side)] =
+                                new CellBorder((BorderStyle)b.Style, b.Colour);
+                        block.RestoreBorders(borders);
+                    }
+
+                    file.Text.Tables.Add(block);
+                }
+            }
+
             // --- Calc section ---
             if (TableExists(connection, "sheets"))
             {
@@ -205,6 +360,29 @@ public sealed class OricFileStore
             }
 
             file.Sheet.EnsureCapacityForCells();
+
+            if (TableExists(connection, "sheet_images"))
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT name, anchor_row, anchor_col, off_x, off_y, width, height, data " +
+                                  "FROM sheet_images WHERE sheet_id = 1 ORDER BY ord";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var image = new SheetImage
+                    {
+                        Name = reader.GetString(0),
+                        AnchorRow = reader.GetInt32(1),
+                        AnchorColumn = reader.GetInt32(2),
+                        OffsetX = reader.GetInt32(3),
+                        OffsetY = reader.GetInt32(4),
+                        Width = reader.GetInt32(5),
+                        Height = reader.GetInt32(6),
+                        Data = (byte[])reader[7],
+                    };
+                    file.Sheet.Images.Add(image);
+                }
+            }
 
             // --- Base section ---
             if (TableExists(connection, "btables"))
@@ -325,6 +503,51 @@ public sealed class OricFileStore
         Execute(connection, "INSERT INTO documents (id, body) VALUES (1, $b)",
             ("$b", file.Text.Body ?? string.Empty));
 
+        Execute(connection, "DELETE FROM doc_runs WHERE doc_id = 1");
+        for (int i = 0; i < file.Text.Runs.Count; i++)
+        {
+            var run = file.Text.Runs[i];
+            if (run.Length <= 0) continue;
+            Execute(connection,
+                "INSERT INTO doc_runs (doc_id, ord, start, len, style) VALUES (1, $o, $s, $l, $t)",
+                ("$o", i.ToString()), ("$s", run.Start.ToString()),
+                ("$l", run.Length.ToString()), ("$t", JsonSerializer.Serialize(run.Style)));
+        }
+
+        for (int i = 0; i < file.Text.Images.Count; i++)
+        {
+            var image = file.Text.Images[i];
+            if (image.IsEmpty) continue;
+            Execute(connection,
+                "INSERT INTO doc_images (doc_id, ord, name, data) VALUES (1, $o, $n, $d)",
+                ("$o", i.ToString()), ("$n", image.Name), ("$d", image.Data));
+        }
+
+        for (int i = 0; i < file.Text.Tables.Count; i++)
+        {
+            var table = file.Text.Tables[i];
+            var payload = new TablePayload
+            {
+                Text = table.Snapshot().Text,
+                Fill = table.Snapshot().Fill,
+                Borders = table.Borders
+                    .Select(pair => new BorderPayload
+                    {
+                        Row = pair.Key.Row,
+                        Column = pair.Key.Column,
+                        Side = (int)pair.Key.Side,
+                        Style = (int)pair.Value.Style,
+                        Colour = pair.Value.Colour,
+                    })
+                    .ToList(),
+            };
+            Execute(connection,
+                "INSERT INTO doc_tables (doc_id, ord, name, rows, cols, data) VALUES (1, $o, $n, $r, $c, $d)",
+                ("$o", i.ToString()), ("$n", table.Name),
+                ("$r", table.Rows.ToString()), ("$c", table.Columns.ToString()),
+                ("$d", JsonSerializer.Serialize(payload)));
+        }
+
         // --- Calc ---
         Execute(connection,
             "INSERT INTO sheets (id, name, rows, cols) VALUES (1, $n, $r, $c)",
@@ -337,6 +560,21 @@ public sealed class OricFileStore
                 "INSERT INTO cells (sheet_id, row, col, raw, value) VALUES (1, $r, $c, $raw, $val)",
                 ("$r", cell.Row.ToString()), ("$c", cell.Column.ToString()),
                 ("$raw", cell.Raw ?? string.Empty), ("$val", cell.Value ?? string.Empty));
+        }
+
+        for (int i = 0; i < file.Sheet.Images.Count; i++)
+        {
+            var image = file.Sheet.Images[i];
+            if (image.IsEmpty) continue;
+            Execute(connection,
+                "INSERT INTO sheet_images " +
+                "(sheet_id, ord, name, anchor_row, anchor_col, off_x, off_y, width, height, data) " +
+                "VALUES (1, $o, $n, $ar, $ac, $ox, $oy, $w, $h, $d)",
+                ("$o", i.ToString()), ("$n", image.Name),
+                ("$ar", image.AnchorRow.ToString()), ("$ac", image.AnchorColumn.ToString()),
+                ("$ox", image.OffsetX.ToString()), ("$oy", image.OffsetY.ToString()),
+                ("$w", image.Width.ToString()), ("$h", image.Height.ToString()),
+                ("$d", image.Data));
         }
 
         // --- Base ---
@@ -366,7 +604,23 @@ public sealed class OricFileStore
 
     // ---------------------------------------------------------------- helpers
 
-    private static void Execute(SqliteConnection connection, string sql, params (string Name, string Value)[] args)
+    private sealed class TablePayload
+    {
+        public string[][] Text { get; set; } = Array.Empty<string[]>();
+        public string?[][]? Fill { get; set; }
+        public List<BorderPayload>? Borders { get; set; }
+    }
+
+    private sealed class BorderPayload
+    {
+        public int Row { get; set; }
+        public int Column { get; set; }
+        public int Side { get; set; }
+        public int Style { get; set; }
+        public string? Colour { get; set; }
+    }
+
+    private static void Execute(SqliteConnection connection, string sql, params (string Name, object Value)[] args)
     {
         using var cmd = connection.CreateCommand();
         cmd.CommandText = sql;
@@ -388,4 +642,16 @@ public sealed class OricFileStore
 
     private static FieldType ParseFieldType(string text)
         => Enum.TryParse<FieldType>(text, ignoreCase: true, out var type) ? type : FieldType.Text;
+}
+
+/// <summary>One entry in the start view's recent-documents list.</summary>
+public sealed class RecentDocumentEntry
+{
+    public string Path { get; set; } = string.Empty;
+
+    public string Title { get; set; } = "Untitled";
+
+    public OricFileKind Kind { get; set; }
+
+    public DateTime LastOpenedUtc { get; set; }
 }

@@ -28,6 +28,10 @@ public enum SuiteIcon
     ZoomOut,
     Field,
     Record,
+    Image,
+    Print,
+    Table,
+    TableDesigner,
 }
 
 /// <summary>A top-level menu ("File", "Edit", ...) with its drop-down items.</summary>
@@ -52,13 +56,15 @@ public sealed class MenuItemModel
         ICommand? command = null,
         Action? action = null,
         bool isSeparator = false,
-        IReadOnlyList<MenuItemModel>? children = null)
+        IReadOnlyList<MenuItemModel>? children = null,
+        string? accelerator = null)
     {
         Header = header;
         Command = command;
         Action = action;
         IsSeparator = isSeparator;
         Children = children;
+        Accelerator = accelerator;
     }
 
     public static MenuItemModel Separator() => new(isSeparator: true);
@@ -68,6 +74,9 @@ public sealed class MenuItemModel
     public Action? Action { get; }
     public bool IsSeparator { get; }
     public IReadOnlyList<MenuItemModel>? Children { get; }
+
+    /// <summary>Keyboard shortcut shown by the native menu (e.g. "Ctrl+P").</summary>
+    public string? Accelerator { get; }
     public bool IsEnabled { get; init; } = true;
 
     public bool HasChildren => Children is { Count: > 0 };

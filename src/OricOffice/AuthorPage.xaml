@@ -5,52 +5,81 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:OricOffice.Core.ViewModels;assembly=OricOffice.Core"
+    xmlns:loc="clr-namespace:OricOffice.MauiShared.Localization;assembly=OricOffice.MauiShared"
     xmlns:shared="clr-namespace:OricOffice.MauiShared.Controls;assembly=OricOffice.MauiShared"
+    xmlns:rt="clr-namespace:OricOffice.MauiShared.RichText;assembly=OricOffice.MauiShared"
     Title="{Binding Title}">
 
     <Grid
-        RowDefinitions="Auto,Auto,1*,Auto"
+        x:Name="RootGrid"
+        RowDefinitions="Auto,Auto,Auto,1*,Auto"
         RowSpacing="0"
         BackgroundColor="{StaticResource Suite.ChromeBrush}">
 
-        <!-- Menu bar: native on Windows/macOS (hidden here), tap-to-open row on tablets -->
+        <!-- Menu bar: native on Windows/macOS (hidden here), tap-to-open on tablets -->
         <shared:SuiteMenuBarView x:Name="CustomMenuBar" Grid.Row="0" ItemsSource="{Binding Menus}" />
 
         <!-- Toolbar -->
         <shared:SuiteToolBarView Grid.Row="1" ItemsSource="{Binding Toolbar}" />
 
-        <!-- Document area: a page on a neutral canvas, LibreOffice-style -->
-        <Grid Grid.Row="2" Padding="20,14" BackgroundColor="{StaticResource Suite.CanvasBrush}">
-            <Border
-                x:Name="DocumentBorder"
-                HorizontalOptions="Center"
-                VerticalOptions="Fill"
-                WidthRequest="940" MaximumWidthRequest="940"
-                BackgroundColor="White"
-                Padding="0"
-                Stroke="{StaticResource Suite.GridLineBrush}"
-                StrokeShape="RoundRectangle 6"
-                StrokeThickness="1">
-                <Grid Margin="44,34">
-                    <Editor
-                        x:Name="BodyEditor"
-                        AutoSize="Disabled"
-                        BackgroundColor="Transparent"
-                        CursorPosition="{Binding CursorPosition, Mode=TwoWay}"
-                        FontFamily="OpenSansRegular"
-                        FontSize="{Binding DocumentFontSize}"
-                        Placeholder="Start typing…"
-                        PlaceholderColor="#B0B0B0"
-                        SelectionLength="{Binding SelectionLength, Mode=TwoWay}"
-                        Text="{Binding Body, Mode=TwoWay}"
-                        TextColor="#1A1A1A" />
-                </Grid>
-            </Border>
-        </Grid>
+        <!-- Character formatting bar: font, size, colours, B/I/U/S, super/sub -->
+        <VerticalStackLayout
+            x:Name="FormatBar"
+            Grid.Row="2"
+            Padding="8,4"
+            Spacing="2">
+            <HorizontalStackLayout x:Name="FormatRow" Spacing="6" VerticalOptions="Center" />
+            <VerticalStackLayout x:Name="PaletteHost" IsVisible="False" Spacing="0" />
+            <VerticalStackLayout x:Name="DesignerHost" IsVisible="False" Spacing="0" />
+        </VerticalStackLayout>
+
+        <!-- Document area: a page on a neutral canvas, LibreOffice-style,
+             with the embedded images and tables below it. -->
+        <ScrollView Grid.Row="3" BackgroundColor="{StaticResource Suite.CanvasBrush}">
+            <VerticalStackLayout Padding="20,14" Spacing="16">
+
+                <Border
+                    x:Name="DocumentBorder"
+                    WidthRequest="940" MaximumWidthRequest="940"
+                    VerticalOptions="Start"
+                    BackgroundColor="White"
+                    Padding="0"
+                    Stroke="{StaticResource Suite.GridLineBrush}"
+                    StrokeShape="RoundRectangle 6"
+                    StrokeThickness="1">
+                    <VerticalStackLayout Spacing="0">
+
+                        <!-- Banner strip: inserted images ride across the top of the page -->
+                        <ScrollView
+                            x:Name="ImageBannerScroller"
+                            HeightRequest="100"
+                            IsVisible="False"
+                            Orientation="Horizontal"
+                            Padding="12,12,12,0">
+                            <HorizontalStackLayout x:Name="ImageBanner" Spacing="8" />
+                        </ScrollView>
+
+                        <!-- 12px inset top/left/right; bottom keeps its deeper writing margin -->
+                        <Grid Margin="12,12,12,34">
+                            <rt:RichTextEditor
+                                x:Name="BodyEditor"
+                                BaseFontSize="{Binding DocumentFontSize}"
+                                PlaceholderText="{loc:Translate UI.StartTyping}"
+                                Text="{Binding Body, Mode=TwoWay}" />
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Embedded images and tables, rebuilt by the code-behind -->
+                <VerticalStackLayout x:Name="ElementsPanel" Spacing="14" />
+
+            </VerticalStackLayout>
+        </ScrollView>
 
         <!-- Status bar with live word count -->
         <Label
-            Grid.Row="3"
+            Grid.Row="4"
             Style="{StaticResource Suite.StatusBar}"
             Text="{Binding StatusText}" />
     </Grid>

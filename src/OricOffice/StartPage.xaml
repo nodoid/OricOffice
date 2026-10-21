@@ -3,11 +3,12 @@
     x:Class="OricOffice.StartPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:loc="clr-namespace:OricOffice.MauiShared.Localization;assembly=OricOffice.MauiShared"
     xmlns:shared="clr-namespace:OricOffice.MauiShared.Controls;assembly=OricOffice.MauiShared"
     Title="">
 
     <Grid
-        RowDefinitions="Auto,1*,Auto"
+        RowDefinitions="Auto,1*,Auto,Auto,Auto"
         RowSpacing="0"
         BackgroundColor="{StaticResource Suite.CanvasBrush}">
 
@@ -22,14 +23,14 @@
                     HorizontalOptions="Center"
                     FontFamily="OpenSansSemibold"
                     FontSize="30"
-                    Text="Oric Office"
+                    Text="{loc:Translate Start.Title}"
                     TextColor="{StaticResource Suite.TextBrush}" />
 
                 <Label
                     Margin="0,0,0,34"
                     HorizontalOptions="Center"
                     Style="{StaticResource Suite.Hint}"
-                    Text="Choose an application to start" />
+                    Text="{loc:Translate Start.Choose}" />
 
                 <HorizontalStackLayout HorizontalOptions="Center" Spacing="28">
 
@@ -59,7 +60,7 @@
                                 HorizontalOptions="Center"
                                 HorizontalTextAlignment="Center"
                                 Style="{StaticResource Suite.Hint}"
-                                Text="Word processor&#10;for documents" />
+                                Text="{loc:Translate Start.AuthorHint}" />
                         </VerticalStackLayout>
                     </Border>
 
@@ -89,7 +90,7 @@
                                 HorizontalOptions="Center"
                                 HorizontalTextAlignment="Center"
                                 Style="{StaticResource Suite.Hint}"
-                                Text="Spreadsheet&#10;with formulas" />
+                                Text="{loc:Translate Start.CalcHint}" />
                         </VerticalStackLayout>
                     </Border>
 
@@ -119,7 +120,7 @@
                                 HorizontalOptions="Center"
                                 HorizontalTextAlignment="Center"
                                 Style="{StaticResource Suite.Hint}"
-                                Text="Database&#10;for records" />
+                                Text="{loc:Translate Start.BaseHint}" />
                         </VerticalStackLayout>
                     </Border>
 
@@ -127,10 +128,33 @@
             </VerticalStackLayout>
         </ScrollView>
 
+        <!-- Recent documents (built by the code-behind) -->
+        <VerticalStackLayout x:Name="RecentSection" Grid.Row="2" Padding="40,0,40,14" Spacing="8" IsVisible="False">
+            <Label
+                x:Name="RecentHeader"
+                FontFamily="OpenSansSemibold"
+                FontSize="13"
+                Text="Recent documents"
+                TextColor="{StaticResource Suite.TextBrush}" />
+            <HorizontalStackLayout x:Name="RecentRow" Spacing="8" />
+        </VerticalStackLayout>
+
+        <!-- Language switcher (buttons built by the code-behind) -->
+        <HorizontalStackLayout
+            x:Name="LanguageRow"
+            Grid.Row="3"
+            Padding="40,6,40,2"
+            Spacing="8">
+            <Label
+                VerticalOptions="Center"
+                Style="{StaticResource Suite.Hint}"
+                Text="{loc:Translate Start.Language}" />
+        </HorizontalStackLayout>
+
         <!-- Status bar -->
         <Label
-            Grid.Row="2"
+            Grid.Row="4"
             Style="{StaticResource Suite.StatusBar}"
-            Text="Oric Office 1.0 · Licensed under DILLIGAF · © Paul F. Johnson" />
+            Text="{loc:Translate Start.Footer}" />
     </Grid>
 </ContentPage>

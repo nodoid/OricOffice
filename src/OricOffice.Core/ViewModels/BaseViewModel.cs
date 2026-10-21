@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OricOffice.Core.Base;
+using OricOffice.Core.Export;
+using OricOffice.Core.Localization;
 using OricOffice.Core.Model;
 using OricOffice.Core.Seeders;
 using OricOffice.Core.Services;
@@ -109,7 +111,7 @@ public sealed partial class RecordViewModel : ObservableObject
 
     public int Ordinal { get; }
 
-    public string Headline => $"Record #{Ordinal}";
+    public string Headline => Loc.Format("Record.Number", Ordinal);
 
     public string ListLabel => $"#{Ordinal}   {Summary}";
 
@@ -134,6 +136,14 @@ public sealed partial class RecordViewModel : ObservableObject
         _owner.MarkRecordEdited();
     }
 
+    /// <summary>Raised after a culture change so localized labels repaint.</summary>
+    public void RefreshLabels()
+    {
+        OnPropertyChanged(nameof(Headline));
+        OnPropertyChanged(nameof(ListLabel));
+        UpdateSummary();
+    }
+
     private void UpdateSummary()
     {
         var parts = _owner.Fields
@@ -141,7 +151,7 @@ public sealed partial class RecordViewModel : ObservableObject
             .Where(v => !string.IsNullOrWhiteSpace(v))
             .Take(3)
             .ToList();
-        Summary = parts.Count == 0 ? "(empty record)" : string.Join("  ·  ", parts);
+        Summary = parts.Count == 0 ? Loc.T("Record.Empty") : string.Join("  ·  ", parts);
     }
 }
 
@@ -192,8 +202,9 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
         IDialogService dialogs,
         IAppLifetimeService lifetime,
         OricFileStore store,
-        AppMeta meta)
-        : base(dialogs, lifetime, store, meta)
+        AppMeta meta,
+        IPrintService? printer = null)
+        : base(dialogs, lifetime, store, meta, printer)
     {
         // A brand-new Base document starts with one field so it is usable immediately.
         ResetDocument();
@@ -211,7 +222,7 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
         RefreshFieldNames();
         foreach (var record in Records) record.RebuildCells();
         MarkDirty();
-        StatusText = $"Added field \"{vm.Name}\"";
+        StatusText = Loc.Format("Status.AddedField", vm.Name);
     }
 
     private void RemoveFieldCore(FieldViewModel field)
@@ -222,7 +233,7 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
         RefreshFieldNames();
         foreach (var record in Records) record.RebuildCells();
         MarkDirty();
-        StatusText = $"Removed field \"{field.Name}\"";
+        StatusText = Loc.Format("Status.RemovedField", field.Name);
     }
 
     internal void OnFieldEdited()
@@ -278,7 +289,7 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
         RefreshRecords();
         SelectedRecord = Records.FirstOrDefault(r => r.Id == row.Id) ?? Records.LastOrDefault();
         MarkDirty();
-        StatusText = $"Added record #{_all.Count}";
+        StatusText = Loc.Format("Status.AddedRecord", _all.Count);
     }
 
     [RelayCommand]
@@ -291,7 +302,7 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
         RefreshRecords();
         SelectedRecord = Records.FirstOrDefault();
         MarkDirty();
-        StatusText = $"Deleted record · {_all.Count} left";
+        StatusText = Loc.Format("Status.DeletedRecord", _all.Count);
     }
 
     internal void MarkRecordEdited() => MarkDirty();
@@ -304,14 +315,14 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
         if (!RecordQuery.TryParse(QueryText, Fields.Select(f => f.ToDef()).ToList(),
                 out var compiled, out var error))
         {
-            StatusText = error ?? "Invalid query.";
+            StatusText = error ?? Loc.T("Status.InvalidQuery");
             return;
         }
         _activeQuery = compiled;
         RefreshRecords();
         StatusText = string.IsNullOrWhiteSpace(QueryText)
-            ? "Showing all records"
-            : $"{Records.Count} of {_all.Count} records match: {QueryText}";
+            ? Loc.T("Status.QueryAll")
+            : Loc.Format("Status.QueryMatch", Records.Count, _all.Count, QueryText);
     }
 
     [RelayCommand]
@@ -320,7 +331,7 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
         QueryText = string.Empty;
         _activeQuery = null;
         RefreshRecords();
-        StatusText = "Filter cleared";
+        StatusText = Loc.T("Status.FilterCleared");
     }
 
     [RelayCommand]
@@ -333,14 +344,14 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
     {
         if (SortFieldName is null)
         {
-            StatusText = "Pick a field to sort by first.";
+            StatusText = Loc.T("Status.PickSortField");
             return;
         }
         var selectedId = SelectedRecord?.Id;
         var fieldDef = Fields.FirstOrDefault(f => f.Name == SortFieldName)?.ToDef();
         if (fieldDef is null)
         {
-            StatusText = $"Field \"{SortFieldName}\" no longer exists.";
+            StatusText = Loc.Format("Status.FieldMissing", SortFieldName);
             return;
         }
 
@@ -350,7 +361,8 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
         RefreshRecords();
         if (selectedId is { } id) SelectedRecord = Records.FirstOrDefault(r => r.Id == id);
         MarkDirty();
-        StatusText = $"Sorted by {fieldDef.Name} {(descending ? "Z→A" : "A→Z")}";
+        StatusText = Loc.Format("Status.SortedBy", fieldDef.Name,
+            descending ? Loc.T("Sort.Desc") : Loc.T("Sort.Asc"));
     }
 
     // ------------------------------------------------------------ refresh
@@ -371,11 +383,16 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
                          ?? Records.FirstOrDefault();
 
         StatusText = _all.Count == Records.Count
-            ? $"{_all.Count} records"
-            : $"{Records.Count} of {_all.Count} records match the filter";
+            ? Loc.Format("Status.RecordsCount", _all.Count)
+            : Loc.Format("Status.RecordsMatch", Records.Count, _all.Count);
     }
 
     // ------------------------------------------------------------ document hooks
+
+    protected override void RefreshLocalizedText()
+    {
+        foreach (var record in Records) record.RefreshLabels();
+    }
 
     protected override void ApplyDocument()
     {
@@ -417,48 +434,129 @@ public sealed partial class BaseViewModel : OricDocumentViewModelBase
             Doc.Title = Title;
     }
 
+    // ------------------------------------------------------------ export / print
+
+    [RelayCommand]
+    private Task ExportSqliteAsync()
+        => ExportAsync(SafeName() + ".sqlite",
+            p => SqlExporters.ExportSqlite(Doc, p), "Status.Exported");
+
+    [RelayCommand]
+    private Task ExportMysqlAsync()
+        => ExportAsync(SafeName() + "-mysql.sql",
+            p => File.WriteAllText(p, SqlExporters.ExportMysqlScript(Doc)), "Status.Exported");
+
+    [RelayCommand]
+    private Task ExportMssqlAsync()
+        => ExportAsync(SafeName() + "-mssql.sql",
+            p => File.WriteAllText(p, SqlExporters.ExportMssqlScript(Doc)), "Status.Exported");
+
+    [RelayCommand]
+    private async Task PrintAsync()
+    {
+        CollectForOutput();
+        await SendToPrinterAsync(BasePdfExporter.Render(Doc));
+    }
+
+    [RelayCommand]
+    private Task PrintToFileAsync()
+        => ExportAsync(SafeName() + ".pdf", p => BasePdfExporter.Export(Doc, p), "Status.PrintedToFile");
+
+    [RelayCommand]
+    private Task ExportOdbAsync()
+        => ExportAsync(SafeName() + ".odb", p => OdbExporter.Export(Doc, p), "Status.Exported");
+
+    [RelayCommand]
+    private Task ExportCsvAsync()
+        => ExportAsync(SafeName() + ".csv",
+            p => File.WriteAllText(p, BaseCsv.Export(Doc), new System.Text.UTF8Encoding(false)),
+            "Status.Exported");
+
+    [RelayCommand]
+    private Task ImportCsvAsync()
+        => ImportExternalAsync(Loc.T("Dialog.ImportCsv"), ".csv", BaseCsv.ImportFile);
+
+    [RelayCommand]
+    private Task ImportOdbAsync()
+        => ImportExternalAsync(Loc.T("Dialog.ImportOdb"), ".odb", OdbImporter.Import);
+
+    [RelayCommand]
+    private Task ImportTapeAsync()
+        => ImportExternalAsync(Loc.T("Dialog.ImportTape"), ".tap",
+            p => TapeImporter.ImportFile(p, OricFileKind.Base));
+
+    private string SafeName()
+    {
+        var name = string.IsNullOrWhiteSpace(Title) ? "Untitled" : Title.Trim();
+        foreach (var c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
+        return name;
+    }
+
     // ------------------------------------------------------------ chrome
 
     protected override IEnumerable<MenuGroup> BuildMenus()
     {
-        yield return new MenuGroup("File",
-            new MenuItemModel("New", command: NewCommand),
-            new MenuItemModel("Open…", command: OpenCommand),
-            new MenuItemModel("Save", command: SaveCommand),
-            new MenuItemModel("Save As…", command: SaveAsCommand),
+        yield return new MenuGroup(Loc.T("Menu.File"),
+            new MenuItemModel(Loc.T("Item.New"), command: NewCommand),
+            new MenuItemModel(Loc.T("Item.Open"), command: OpenCommand),
+            new MenuItemModel(Loc.T("Item.Save"), command: SaveCommand),
+            new MenuItemModel(Loc.T("Item.SaveAs"), command: SaveAsCommand),
             MenuItemModel.Separator(),
-            new MenuItemModel("Exit", command: ExitCommand));
-
-        yield return new MenuGroup("Table",
-            new MenuItemModel("Add Field", command: AddFieldCommand));
-
-        yield return new MenuGroup("Record",
-            new MenuItemModel("New Record", command: AddRecordCommand),
-            new MenuItemModel("Delete Record", command: DeleteRecordCommand),
+            new MenuItemModel(Loc.T("Item.Export"), children: new[]
+            {
+                new MenuItemModel(Loc.T("Export.Sqlite"), command: ExportSqliteCommand),
+                new MenuItemModel(Loc.T("Export.Mysql"), command: ExportMysqlCommand),
+                new MenuItemModel(Loc.T("Export.Mssql"), command: ExportMssqlCommand),
+                new MenuItemModel(Loc.T("Export.Odb"), command: ExportOdbCommand),
+                new MenuItemModel(Loc.T("Export.Csv"), command: ExportCsvCommand),
+            }),
+            new MenuItemModel(Loc.T("Item.Import"), children: new[]
+            {
+                new MenuItemModel(Loc.T("Import.Odb"), command: ImportOdbCommand),
+                new MenuItemModel(Loc.T("Import.Csv"), command: ImportCsvCommand),
+                new MenuItemModel(Loc.T("Import.Tape"), command: ImportTapeCommand),
+            }),
+            new MenuItemModel(Loc.T("Item.Print"), children: new[]
+            {
+                new MenuItemModel(Loc.T("Item.PrintEllipsis"), command: PrintCommand, accelerator: "Ctrl+P"),
+                new MenuItemModel(Loc.T("Item.PrintToFile"), command: PrintToFileCommand),
+            }),
             MenuItemModel.Separator(),
-            new MenuItemModel("Sort A→Z", command: SortAscendingCommand),
-            new MenuItemModel("Sort Z→A", command: SortDescendingCommand));
+            new MenuItemModel(Loc.T("Item.Exit"), command: ExitCommand));
 
-        yield return new MenuGroup("Query",
-            new MenuItemModel("Apply Filter", command: ApplyQueryCommand),
-            new MenuItemModel("Clear Filter", command: ClearQueryCommand));
+        yield return new MenuGroup(Loc.T("Menu.Table"),
+            new MenuItemModel(Loc.T("Item.AddField"), command: AddFieldCommand));
 
-        yield return new MenuGroup("Help",
-            new MenuItemModel($"About {Meta.Name}", command: AboutCommand));
+        yield return new MenuGroup(Loc.T("Menu.Record"),
+            new MenuItemModel(Loc.T("Item.NewRecord"), command: AddRecordCommand),
+            new MenuItemModel(Loc.T("Item.DeleteRecord"), command: DeleteRecordCommand),
+            MenuItemModel.Separator(),
+            new MenuItemModel(Loc.T("Item.SortAsc"), command: SortAscendingCommand),
+            new MenuItemModel(Loc.T("Item.SortDesc"), command: SortDescendingCommand));
+
+        yield return new MenuGroup(Loc.T("Menu.Query"),
+            new MenuItemModel(Loc.T("Item.ApplyFilter"), command: ApplyQueryCommand),
+            new MenuItemModel(Loc.T("Item.ClearFilter"), command: ClearQueryCommand));
+
+        yield return new MenuGroup(Loc.T("Menu.Help"),
+            new MenuItemModel(Loc.Format("Item.About", Meta.Name), command: AboutCommand));
     }
 
     protected override IEnumerable<ToolButtonModel> BuildToolbar()
     {
-        yield return new ToolButtonModel("New", SuiteIcon.New, NewCommand);
-        yield return new ToolButtonModel("Open", SuiteIcon.Open, OpenCommand);
-        yield return new ToolButtonModel("Save", SuiteIcon.Save, SaveCommand);
-        yield return new ToolButtonModel("Save As", SuiteIcon.SaveAs, SaveAsCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.New"), SuiteIcon.New, NewCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.Open"), SuiteIcon.Open, OpenCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.Save"), SuiteIcon.Save, SaveCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.SaveAs"), SuiteIcon.SaveAs, SaveAsCommand);
         yield return ToolButtonModel.Separator();
-        yield return new ToolButtonModel("New Record", SuiteIcon.Record, AddRecordCommand);
-        yield return new ToolButtonModel("Delete", SuiteIcon.Trash, DeleteRecordCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.NewRecord"), SuiteIcon.Record, AddRecordCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.Delete"), SuiteIcon.Trash, DeleteRecordCommand);
         yield return ToolButtonModel.Separator();
-        yield return new ToolButtonModel("+ Field", SuiteIcon.AddField, AddFieldCommand);
-        yield return new ToolButtonModel("Sort A→Z", SuiteIcon.SortAsc, SortAscendingCommand);
-        yield return new ToolButtonModel("Sort Z→A", SuiteIcon.SortDesc, SortDescendingCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.AddField"), SuiteIcon.AddField, AddFieldCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.SortAsc"), SuiteIcon.SortAsc, SortAscendingCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.SortDesc"), SuiteIcon.SortDesc, SortDescendingCommand);
+        yield return ToolButtonModel.Separator();
+        yield return new ToolButtonModel(Loc.T("Tool.Print"), SuiteIcon.Print, PrintCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.PrintToFile"), SuiteIcon.Print, PrintToFileCommand);
     }
 }

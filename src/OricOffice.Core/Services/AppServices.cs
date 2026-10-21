@@ -36,3 +36,16 @@ public interface ITextClipboard
     Task<string?> GetTextAsync();
     Task SetTextAsync(string? text);
 }
+
+/// <summary>
+/// Sends a rendered document to a printer. Implemented by the MAUI head;
+/// "print to file" is handled by the export commands instead (PDF).
+/// </summary>
+public interface IPrintService
+{
+    /// <summary>
+    /// Prints the given PDF. Returns null on success, or a message explaining
+    /// why printing could not be completed (shown to the user by the caller).
+    /// </summary>
+    Task<string?> PrintPdfAsync(byte[] pdf, string documentName);
+}

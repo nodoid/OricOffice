@@ -25,7 +25,9 @@ public sealed class TempDir : IDisposable
 public class OricFileStoreTests : IDisposable
 {
     private readonly TempDir _dir = new();
-    private readonly OricFileStore _store = new();
+    private readonly OricFileStore _store;
+
+    public OricFileStoreTests() => _store = new OricFileStore(_dir.Path); // rooted: drafts/recents stay in the test dir
 
     public void Dispose() => _dir.Dispose();
 

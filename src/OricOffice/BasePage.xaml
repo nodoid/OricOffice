@@ -5,6 +5,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:OricOffice.Core.ViewModels;assembly=OricOffice.Core"
+    xmlns:loc="clr-namespace:OricOffice.MauiShared.Localization;assembly=OricOffice.MauiShared"
     xmlns:shared="clr-namespace:OricOffice.MauiShared.Controls;assembly=OricOffice.MauiShared"
     Title="{Binding Title}">
 
@@ -29,23 +30,23 @@
             <Entry
                 Grid.Column="0"
                 Completed="OnQueryCompleted"
-                Placeholder='filter, e.g.  name contains "smith" AND age >= 21'
+                Placeholder="{loc:Translate UI.FilterPlaceholder}"
                 Style="{StaticResource Suite.BarEntry}"
                 Text="{Binding QueryText, Mode=TwoWay}" />
             <Button
                 Grid.Column="1"
                 Command="{Binding ApplyQueryCommand}"
                 Style="{StaticResource Suite.SmallButton}"
-                Text="Apply filter" />
+                Text="{loc:Translate UI.ApplyFilter}" />
             <Button
                 Grid.Column="2"
                 Command="{Binding ClearQueryCommand}"
                 Style="{StaticResource Suite.SmallButton}"
-                Text="Clear" />
+                Text="{loc:Translate Tool.Clear}" />
             <Label
                 Grid.Column="3"
                 FontSize="12"
-                Text="Sort by"
+                Text="{loc:Translate UI.SortBy}"
                 TextColor="{StaticResource Suite.TextSecondaryBrush}"
                 VerticalOptions="Center" />
             <Picker
@@ -54,19 +55,19 @@
                 FontSize="13"
                 ItemsSource="{Binding FieldNames}"
                 SelectedItem="{Binding SortFieldName, Mode=TwoWay}"
-                Title="Field"
+                Title="{loc:Translate UI.Field}"
                 VerticalOptions="Center"
                 WidthRequest="132" />
             <Button
                 Grid.Column="5"
                 Command="{Binding SortAscendingCommand}"
                 Style="{StaticResource Suite.SmallButton}"
-                Text="A→Z" />
+                Text="{loc:Translate Sort.Asc}" />
             <Button
                 Grid.Column="6"
                 Command="{Binding SortDescendingCommand}"
                 Style="{StaticResource Suite.SmallButton}"
-                Text="Z→A" />
+                Text="{loc:Translate Sort.Desc}" />
         </Grid>
 
         <!-- Field chips strip -->
@@ -124,7 +125,7 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
                 <CollectionView.EmptyView>
-                    <Label Padding="2,10" Style="{StaticResource Suite.Hint}" Text="No fields yet — press “+ Field”." />
+                    <Label Padding="2,10" Style="{StaticResource Suite.Hint}" Text="{loc:Translate UI.NoFields}" />
                 </CollectionView.EmptyView>
             </CollectionView>
 
@@ -133,7 +134,7 @@
                 Command="{Binding AddFieldCommand}"
                 HeightRequest="34"
                 Style="{StaticResource Suite.SmallButton}"
-                Text="+ Field" />
+                Text="{loc:Translate Tool.AddField}" />
         </Grid>
 
         <!-- Records list | record editor -->
@@ -170,7 +171,7 @@
                         <Label
                             Padding="16,16"
                             Style="{StaticResource Suite.Hint}"
-                            Text="No records yet — press New Record in the toolbar." />
+                            Text="{loc:Translate UI.NoRecords}" />
                     </CollectionView.EmptyView>
                 </CollectionView>
             </Border>
@@ -194,7 +195,7 @@
                         Margin="16,12,16,4"
                         IsVisible="{Binding NoRecordSelected}"
                         Style="{StaticResource Suite.Hint}"
-                        Text="Select or create a record to edit it here." />
+                        Text="{loc:Translate UI.SelectRecord}" />
                     <CollectionView Grid.Row="1" ItemsSource="{Binding SelectedRecord.Cells}" SelectionMode="None">
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="vm:RecordCellViewModel">
@@ -219,7 +220,7 @@
                             <Label
                                 Padding="16,16"
                                 Style="{StaticResource Suite.Hint}"
-                                Text="Add a field above to start entering data." />
+                                Text="{loc:Translate UI.AddFieldAbove}" />
                         </CollectionView.EmptyView>
                     </CollectionView>
                 </Grid>

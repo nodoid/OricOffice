@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OricOffice.Core.Calc;
+using OricOffice.Core.Export;
+using OricOffice.Core.Localization;
 using OricOffice.Core.Model;
 using OricOffice.Core.Seeders;
 using OricOffice.Core.Services;
@@ -73,11 +75,83 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
         IDialogService dialogs,
         IAppLifetimeService lifetime,
         OricFileStore store,
-        AppMeta meta)
-        : base(dialogs, lifetime, store, meta)
+        AppMeta meta,
+        IPrintService? printer = null)
+        : base(dialogs, lifetime, store, meta, printer)
     {
         RebuildGrid(SheetDocument.MinRows, SheetDocument.MinColumns);
         SelectCell(_cells[0, 0]);
+    }
+
+    // ------------------------------------------------------------ floating images
+
+    /// <summary>Raised after floating images are added, removed or loaded.</summary>
+    public event Action? ImagesChanged;
+
+    private void RaiseImagesChanged() => ImagesChanged?.Invoke();
+
+    public IReadOnlyList<SheetImage> Images => Doc.Sheet.Images;
+
+    [RelayCommand]
+    private async Task ImportImageAsync()
+    {
+        var path = await Dialogs.PickOpenPathAsync(Loc.T("Dialog.InsertImage"), ".png", ".jpg", ".jpeg");
+        if (path is null) return;
+        try
+        {
+            var data = File.ReadAllBytes(path);
+            if (!ImageDetector.IsSupported(data))
+            {
+                await Dialogs.MessageAsync(Loc.T("Dialog.InsertImage"),
+                    Loc.T("Dialog.InsertImage.NotAnImage"));
+                return;
+            }
+
+            var (w, h) = ImageSize.Of(data);
+            if (w <= 0 || h <= 0) { w = 160; h = 120; }
+            var scale = Math.Min(1.0, 480.0 / Math.Max(w, h));
+
+            var anchorRow = SelectedCell?.Row ?? 0;
+            var anchorColumn = SelectedCell?.Column ?? 0;
+            var image = new SheetImage(Path.GetFileName(path), data, anchorRow, anchorColumn)
+            {
+                Width = Math.Max(24, (int)(w * scale)),
+                Height = Math.Max(24, (int)(h * scale)),
+            };
+            Doc.Sheet.Images.Add(image);
+            MarkDirty();
+            RaiseImagesChanged();
+            StatusText = Loc.Format("Status.InsertedImage", Path.GetFileName(path));
+        }
+        catch (Exception ex)
+        {
+            await Dialogs.MessageAsync(Loc.T("Dialog.InsertImage"), ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private void RemoveImage(int index)
+    {
+        if (index < 0 || index >= Doc.Sheet.Images.Count) return;
+        Doc.Sheet.Images.RemoveAt(index);
+        MarkDirty();
+        RaiseImagesChanged();
+    }
+
+    /// <summary>Called by the view after the user drags an image.</summary>
+    public void MoveImage(SheetImage image, int offsetX, int offsetY)
+    {
+        image.OffsetX = offsetX;
+        image.OffsetY = offsetY;
+        MarkDirty();
+    }
+
+    /// <summary>Called by the view after the user drags the resize grip.</summary>
+    public void ResizeImage(SheetImage image, int width, int height)
+    {
+        image.Width = Math.Max(24, width);
+        image.Height = Math.Max(24, height);
+        MarkDirty();
     }
 
     public int Rows => _rows;
@@ -148,8 +222,8 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
 
     private void UpdateCellStatus(CellViewModel cell)
     {
-        var shown = string.IsNullOrEmpty(cell.Display) ? "(blank)" : cell.Display;
-        StatusText = $"{cell.Address} = {shown}    ·    {Rows} rows × {Columns} columns";
+        var shown = string.IsNullOrEmpty(cell.Display) ? Loc.T("Status.Blank") : cell.Display;
+        StatusText = Loc.Format("Status.CellStatus", cell.Address, shown, Rows, Columns);
     }
 
     // ------------------------------------------------------------ editing
@@ -168,12 +242,12 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
         if (SelectedCell is null) return;
         if (!CellAddress.TryParse(NameBoxText, out var address))
         {
-            StatusText = $"\"{NameBoxText}\" is not a cell address (expected e.g. B12).";
+            StatusText = Loc.Format("Status.NotAnAddress", NameBoxText);
             return;
         }
         if (address.Row >= _rows || address.Column >= _columns)
         {
-            StatusText = $"{address} is outside the current grid ({Rows} × {Columns}). Add rows/columns first.";
+            StatusText = Loc.Format("Status.OutsideGrid", address, Rows, Columns);
             return;
         }
         SelectCell(_cells[address.Row, address.Column]);
@@ -205,14 +279,14 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
         var range = FindNumericRunAbove(cell) ?? FindNumericRunLeft(cell);
         if (range is null)
         {
-            StatusText = "AutoSum: no numbers found next to this cell.";
+            StatusText = Loc.T("Status.NoNumbersNearby");
             return;
         }
 
         var (start, end) = range.Value;
         var formula = $"=SUM({start}:{end})";
         CommitTo(cell, formula);
-        StatusText = $"{cell.Address} = {formula}";
+        StatusText = Loc.Format("Status.CellStatus2", cell.Address, formula);
     }
 
     private (string Start, string End)? FindNumericRunAbove(CellViewModel cell)
@@ -251,7 +325,7 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
         RebuildGrid(_rows + 1, _columns);
         Recalculate();
         MarkDirty();
-        StatusText = $"Grid is now {Rows} rows × {Columns} columns";
+        StatusText = Loc.Format("Status.GridSize", Rows, Columns);
     }
 
     [RelayCommand]
@@ -260,7 +334,7 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
         RebuildGrid(_rows, _columns + 1);
         Recalculate();
         MarkDirty();
-        StatusText = $"Grid is now {Rows} rows × {Columns} columns";
+        StatusText = Loc.Format("Status.GridSize", Rows, Columns);
     }
 
     // ------------------------------------------------------------ recalculation
@@ -284,6 +358,11 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
 
     // ------------------------------------------------------------ document hooks
 
+    protected override void RefreshLocalizedText()
+    {
+        if (SelectedCell is { } cell) UpdateCellStatus(cell);
+    }
+
     protected override void ApplyDocument()
     {
         ContentSeeder.EnsureSheet(Doc.Sheet, Doc.Text, Doc.Table);
@@ -300,12 +379,10 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
         {
             if (position.Row < _rows && position.Column < _columns)
                 _cells[position.Row, position.Column].SetRaw(source.Raw);
-        }
-
-        Recalculate();
+        }        Recalculate();
         SelectCell(_cells[0, 0]);
+        RaiseImagesChanged();
     }
-
     protected override void ResetDocument()
     {
         RebuildGrid(SheetDocument.MinRows, SheetDocument.MinColumns);
@@ -317,6 +394,7 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
             }
         Recalculate();
         SelectCell(_cells[0, 0]);
+        RaiseImagesChanged();
     }
 
     protected override void CollectDocument()
@@ -336,41 +414,110 @@ public sealed partial class CalcViewModel : OricDocumentViewModelBase
             Doc.Title = Title;
     }
 
+    // ------------------------------------------------------------ export / print
+
+    [RelayCommand]
+    private Task ExportPdfAsync()
+        => ExportAsync(SafeName() + ".pdf", p => CalcPdfExporter.Export(Doc, p), "Status.Exported");
+
+    [RelayCommand]
+    private Task ExportOdsAsync()
+        => ExportAsync(SafeName() + ".ods", p => OdfExporter.ExportOds(Doc, p), "Status.Exported");
+
+    [RelayCommand]
+    private async Task PrintAsync()
+    {
+        CollectForOutput();
+        await SendToPrinterAsync(CalcPdfExporter.Render(Doc));
+    }
+
+    [RelayCommand]
+    private Task PrintToFileAsync()
+        => ExportAsync(SafeName() + ".pdf", p => CalcPdfExporter.Export(Doc, p), "Status.PrintedToFile");
+
+    [RelayCommand]
+    private Task ExportCsvAsync()
+        => ExportAsync(SafeName() + ".csv",
+            p => File.WriteAllText(p, CalcCsv.Export(Doc.Sheet), new System.Text.UTF8Encoding(false)),
+            "Status.Exported");
+
+    [RelayCommand]
+    private Task ImportCsvAsync()
+        => ImportExternalAsync(Loc.T("Dialog.ImportCsv"), ".csv", CalcCsv.ImportFile);
+
+    [RelayCommand]
+    private Task ImportOdsAsync()
+        => ImportExternalAsync(Loc.T("Dialog.ImportOds"), ".ods", OdfImporter.ImportOds);
+
+    [RelayCommand]
+    private Task ImportTapeAsync()
+        => ImportExternalAsync(Loc.T("Dialog.ImportTape"), ".tap",
+            p => TapeImporter.ImportFile(p, OricFileKind.Calc));
+
+    private string SafeName()
+    {
+        var name = string.IsNullOrWhiteSpace(Title) ? "Untitled" : Title.Trim();
+        foreach (var c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
+        return name;
+    }
+
     // ------------------------------------------------------------ chrome
 
     protected override IEnumerable<MenuGroup> BuildMenus()
     {
-        yield return new MenuGroup("File",
-            new MenuItemModel("New", command: NewCommand),
-            new MenuItemModel("Open…", command: OpenCommand),
-            new MenuItemModel("Save", command: SaveCommand),
-            new MenuItemModel("Save As…", command: SaveAsCommand),
+        yield return new MenuGroup(Loc.T("Menu.File"),
+            new MenuItemModel(Loc.T("Item.New"), command: NewCommand),
+            new MenuItemModel(Loc.T("Item.Open"), command: OpenCommand),
+            new MenuItemModel(Loc.T("Item.Save"), command: SaveCommand),
+            new MenuItemModel(Loc.T("Item.SaveAs"), command: SaveAsCommand),
             MenuItemModel.Separator(),
-            new MenuItemModel("Exit", command: ExitCommand));
+            new MenuItemModel(Loc.T("Item.Export"), children: new[]
+            {
+                new MenuItemModel(Loc.T("Export.Pdf"), command: ExportPdfCommand),
+                new MenuItemModel(Loc.T("Export.Ods"), command: ExportOdsCommand),
+                new MenuItemModel(Loc.T("Export.Csv"), command: ExportCsvCommand),
+            }),
+            new MenuItemModel(Loc.T("Item.Import"), children: new[]
+            {
+                new MenuItemModel(Loc.T("Import.Ods"), command: ImportOdsCommand),
+                new MenuItemModel(Loc.T("Import.Csv"), command: ImportCsvCommand),
+                new MenuItemModel(Loc.T("Import.Tape"), command: ImportTapeCommand),
+            }),
+            new MenuItemModel(Loc.T("Item.Print"), children: new[]
+            {
+                new MenuItemModel(Loc.T("Item.PrintEllipsis"), command: PrintCommand, accelerator: "Ctrl+P"),
+                new MenuItemModel(Loc.T("Item.PrintToFile"), command: PrintToFileCommand),
+            }),
+            MenuItemModel.Separator(),
+            new MenuItemModel(Loc.T("Item.Exit"), command: ExitCommand));
 
-        yield return new MenuGroup("Insert",
-            new MenuItemModel("Add Row", command: AddRowCommand),
-            new MenuItemModel("Add Column", command: AddColumnCommand));
+        yield return new MenuGroup(Loc.T("Menu.Insert"),
+            new MenuItemModel(Loc.T("Item.Image"), command: ImportImageCommand),
+            new MenuItemModel(Loc.T("Item.AddRow"), command: AddRowCommand),
+            new MenuItemModel(Loc.T("Item.AddColumn"), command: AddColumnCommand));
 
-        yield return new MenuGroup("Cell",
-            new MenuItemModel("AutoSum", command: AutoSumCommand),
-            new MenuItemModel("Clear Cell", command: ClearCellCommand));
+        yield return new MenuGroup(Loc.T("Menu.Cell"),
+            new MenuItemModel(Loc.T("Item.AutoSum"), command: AutoSumCommand),
+            new MenuItemModel(Loc.T("Item.ClearCell"), command: ClearCellCommand));
 
-        yield return new MenuGroup("Help",
-            new MenuItemModel($"About {Meta.Name}", command: AboutCommand));
+        yield return new MenuGroup(Loc.T("Menu.Help"),
+            new MenuItemModel(Loc.Format("Item.About", Meta.Name), command: AboutCommand));
     }
 
     protected override IEnumerable<ToolButtonModel> BuildToolbar()
     {
-        yield return new ToolButtonModel("New", SuiteIcon.New, NewCommand);
-        yield return new ToolButtonModel("Open", SuiteIcon.Open, OpenCommand);
-        yield return new ToolButtonModel("Save", SuiteIcon.Save, SaveCommand);
-        yield return new ToolButtonModel("Save As", SuiteIcon.SaveAs, SaveAsCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.New"), SuiteIcon.New, NewCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.Open"), SuiteIcon.Open, OpenCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.Save"), SuiteIcon.Save, SaveCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.SaveAs"), SuiteIcon.SaveAs, SaveAsCommand);
         yield return ToolButtonModel.Separator();
-        yield return new ToolButtonModel("AutoSum", SuiteIcon.Sum, AutoSumCommand);
-        yield return new ToolButtonModel("Clear", SuiteIcon.Clear, ClearCellCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.AutoSum"), SuiteIcon.Sum, AutoSumCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.Clear"), SuiteIcon.Clear, ClearCellCommand);
         yield return ToolButtonModel.Separator();
-        yield return new ToolButtonModel("+ Row", SuiteIcon.AddRow, AddRowCommand);
-        yield return new ToolButtonModel("+ Column", SuiteIcon.AddColumn, AddColumnCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.AddRow"), SuiteIcon.AddRow, AddRowCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.AddColumn"), SuiteIcon.AddColumn, AddColumnCommand);
+        yield return ToolButtonModel.Separator();
+        yield return new ToolButtonModel(Loc.T("Tool.Print"), SuiteIcon.Print, PrintCommand);
+        yield return new ToolButtonModel(Loc.T("Tool.PrintToFile"), SuiteIcon.Print, PrintToFileCommand);
     }
 }

@@ -5,6 +5,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:OricOffice.Core.ViewModels;assembly=OricOffice.Core"
+    xmlns:loc="clr-namespace:OricOffice.MauiShared.Localization;assembly=OricOffice.MauiShared"
     xmlns:shared="clr-namespace:OricOffice.MauiShared.Controls;assembly=OricOffice.MauiShared"
     Title="{Binding Title}">
 
@@ -43,14 +44,14 @@
                 Grid.Column="2"
                 x:Name="FormulaEntry"
                 Completed="OnFormulaCommitted"
-                Placeholder="value or =formula (e.g. =SUM(A1:A5))"
+                Placeholder="{loc:Translate UI.FormulaPlaceholder}"
                 Style="{StaticResource Suite.BarEntry}"
                 Text="{Binding FormulaBarText, Mode=TwoWay}" />
             <Button
                 Grid.Column="3"
                 Command="{Binding CommitFormulaCommand}"
                 Style="{StaticResource Suite.SmallButton}"
-                Text="Apply" />
+                Text="{loc:Translate UI.Apply}" />
         </Grid>
 
         <!-- Spreadsheet grid (built in code-behind from the view model) -->
@@ -63,7 +64,11 @@
             StrokeShape="RoundRectangle 4"
             StrokeThickness="1">
             <ScrollView x:Name="GridScroller" Orientation="Both">
-                <VerticalStackLayout x:Name="GridContainer" Padding="10,8" Spacing="0" />
+                <Grid x:Name="ScrollContent">
+                    <VerticalStackLayout x:Name="GridContainer" Padding="10,8" Spacing="0" />
+                    <!-- Floating images, positioned over the grid (10,8 matches GridContainer padding) -->
+                    <AbsoluteLayout x:Name="ImageLayer" />
+                </Grid>
             </ScrollView>
         </Border>
 

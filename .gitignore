@@ -25,6 +25,10 @@ coverage*.info
 *.snupkg
 packages/
 
+# Python (tooling scripts)
+__pycache__/
+*.pyc
+
 # OS files
 .DS_Store
 Thumbs.db

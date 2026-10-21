@@ -13,17 +13,27 @@ public partial class BasePage : ContentPage
         InitializeComponent();
         _viewModel = viewModel;
 
-        // A way back to the start center.
-        viewModel.Menus.Insert(0, new MenuGroup("Home",
-            new MenuItemModel("Back to Start", action: () => _ = Navigation.PopToRootAsync())));
+        // Home → Back to Start and File → Exit both return to the start view;
+        // the Home menu group itself lives in the view model so it survives
+        // culture changes.
+        viewModel.ReturnToStart = () => Navigation.PopToRootAsync();
 
         BindingContext = viewModel;
 
         if (SuiteMenuBar.UsesNativeMenuBar)
         {
             CustomMenuBar.IsVisible = false;
-            SuiteMenuBar.Bind(this, viewModel.Menus);
+            BindNativeMenus(viewModel.Menus);
+            OricOffice.Core.Localization.Loc.Instance.CultureChanged +=
+                () => BindNativeMenus(viewModel.Menus);
         }
+    }
+
+    /// <summary>Rebuilds the native menu bar after a culture change.</summary>
+    private void BindNativeMenus(IEnumerable<OricOffice.Core.Ui.MenuGroup> menus)
+    {
+        MenuBarItems.Clear();
+        SuiteMenuBar.Bind(this, menus);
     }
 
     private void OnQueryCompleted(object? sender, EventArgs e)

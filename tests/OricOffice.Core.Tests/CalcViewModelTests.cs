@@ -10,7 +10,9 @@ public class CalcViewModelTests : IDisposable
     private readonly TempDir _dir = new();
     private readonly FakeDialogs _dialogs = new();
     private readonly FakeLifetime _lifetime = new();
-    private readonly OricFileStore _store = new();
+    private readonly OricFileStore _store;
+
+    public CalcViewModelTests() => _store = new OricFileStore(_dir.Path); // rooted: drafts/recents stay in the test dir
 
     public void Dispose() => _dir.Dispose();
 
@@ -53,6 +55,29 @@ public class CalcViewModelTests : IDisposable
         var vm = Create();
         Enter(vm, 0, 0, "hello");
         Assert.Equal("hello", vm.CellAt(0, 0).Display);
+    }
+
+    // ------------------------------------------------------------ floating images
+
+    [Fact]
+    public void ResizeImage_UpdatesSizeMarksDirtyAndClamps()
+    {
+        var vm = Create();
+        var image = new SheetImage("photo.png", new byte[] { 1, 2, 3 }, 0, 0)
+        {
+            Width = 160,
+            Height = 120,
+        };
+        vm.Doc.Sheet.Images.Add(image);
+
+        vm.ResizeImage(image, 320, 240);
+        Assert.Equal(320, image.Width);
+        Assert.Equal(240, image.Height);
+        Assert.True(vm.IsDirty);
+
+        vm.ResizeImage(image, 5, 5); // clamped to the minimum
+        Assert.Equal(24, image.Width);
+        Assert.Equal(24, image.Height);
     }
 
     [Fact]
@@ -181,7 +206,7 @@ public class CalcViewModelTests : IDisposable
     public void MenusAndToolbar_AreBuilt()
     {
         var vm = Create();
-        Assert.Equal(new[] { "File", "Insert", "Cell", "Help" }, vm.Menus.Select(m => m.Header));
+        Assert.Equal(new[] { "Home", "File", "Insert", "Cell", "Help" }, vm.Menus.Select(m => m.Header));
         Assert.Contains(vm.Toolbar, b => b.Text == "AutoSum");
         Assert.Contains(vm.Toolbar, b => b.Text == "+ Row");
     }

@@ -177,6 +177,43 @@ public sealed class SuiteIconDrawable : IDrawable
                 Line(12, 14.5f, 16, 14.5f);
                 break;
 
+            case SuiteIcon.Image:
+                // Picture frame with a sun and a mountain line.
+                Rect(3, 5, 18, 14, 1.5f);
+                canvas.DrawEllipse(U(7.5f), V(9), U(3) - U(0), V(3) - V(0));
+                Line(4.5f, 17, 10, 11);
+                Line(10, 11, 13.5f, 14.5f);
+                Line(13.5f, 14.5f, 16.5f, 11.5f);
+                Line(16.5f, 11.5f, 19.5f, 14.5f);
+                break;
+
+            case SuiteIcon.Print:
+                // Paper feeding out of a printer body.
+                Rect(7, 3, 10, 6, 0.5f);
+                Rect(3, 9, 18, 8, 1.5f);
+                canvas.DrawEllipse(U(17.25f), V(13), U(1.5f) - U(0), V(1.5f) - V(0));
+                Rect(6, 15, 12, 6, 0.5f);
+                break;
+
+            case SuiteIcon.Table:
+                // 3×3 grid.
+                Rect(3, 5, 18, 14, 1.5f);
+                Line(3, 9.667f, 21, 9.667f);
+                Line(3, 14.333f, 21, 14.333f);
+                Line(9, 5, 9, 19);
+                Line(15, 5, 15, 19);
+                break;
+
+            case SuiteIcon.TableDesigner:
+                // Grid with a styling pen.
+                Rect(3, 4, 13, 13, 1.5f);
+                Line(3, 8.5f, 16, 8.5f);
+                Line(3, 12.5f, 16, 12.5f);
+                Line(9.5f, 4, 9.5f, 17);
+                Line(15.5f, 12.5f, 21, 18);
+                Line(19.5f, 16.5f, 21.5f, 18.5f);
+                break;
+
             default:
                 // None: draw nothing.
                 break;

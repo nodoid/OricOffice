@@ -20,10 +20,14 @@ public sealed class SheetDocument
 
     public IReadOnlyDictionary<(int Row, int Column), Cell> Cells => _cells;
 
+    /// <summary>Images floating over the grid, in sheet order.</summary>
+    public List<SheetImage> Images { get; } = new();
+
     public int UsedRowCount { get; private set; }
     public int UsedColumnCount { get; private set; }
 
-    public bool IsEmpty => _cells.Count == 0 || _cells.Values.All(c => c.IsEmpty);
+    public bool IsEmpty
+        => Images.Count == 0 && (_cells.Count == 0 || _cells.Values.All(c => c.IsEmpty));
 
     public Cell? Find(int row, int column)
         => _cells.TryGetValue((row, column), out var cell) ? cell : null;
@@ -64,6 +68,8 @@ public sealed class SheetDocument
     }
 
     public void ClearCells() { _cells.Clear(); UsedRowCount = 0; UsedColumnCount = 0; }
+
+    public void ClearImages() => Images.Clear();
 
     public void EnsureCapacity(int rows, int columns)
     {
