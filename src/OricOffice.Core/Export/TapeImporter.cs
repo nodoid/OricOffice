@@ -17,6 +17,16 @@ public static class TapeImporter
 
     public static OricFile Import(byte[] tap, string title, OricFileKind kind)
     {
+        // A raw AUTHOR document image (install block + NUL-terminated text) is
+        // imported as the document itself, not as a tape listing.
+        if (OricAuthorText.IsAuthorDocument(tap))
+        {
+            var authorDoc = OricAuthorText.Parse(tap);
+            var raw = OricFile.CreateNew(kind, string.IsNullOrWhiteSpace(authorDoc.Name) ? title : authorDoc.Name);
+            raw.Text.Body = authorDoc.Body;
+            return raw;
+        }
+
         var files = OricTap.Read(tap);
         if (files.Count == 0)
             throw new InvalidDataException("That file does not contain any Oric tape files.");
@@ -25,6 +35,17 @@ public static class TapeImporter
         foreach (var file in files)
         {
             var name = string.IsNullOrWhiteSpace(file.Name) ? "(unnamed)" : file.Name;
+
+            // An AUTHOR text stored on tape carries the same install+text image
+            // as its payload; import it as the document rather than a listing.
+            if (OricAuthorText.IsAuthorDocument(file.Payload))
+            {
+                var doc = OricAuthorText.Parse(file.Payload);
+                var document = OricFile.CreateNew(kind, name);
+                document.Text.Body = doc.Body;
+                return document;
+            }
+
             body.Append("==== ")
                 .Append(name)
                 .Append(file.IsBasic ? " [BASIC]" : " [BLOCK]")
@@ -37,8 +58,8 @@ public static class TapeImporter
             body.Append('\n');
         }
 
-        var document = OricFile.CreateNew(kind, title);
-        document.Text.Body = body.ToString().TrimEnd() + "\n";
-        return document;
+        var outDoc = OricFile.CreateNew(kind, title);
+        outDoc.Text.Body = body.ToString().TrimEnd() + "\n";
+        return outDoc;
     }
 }

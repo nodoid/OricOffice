@@ -82,6 +82,20 @@ function Send-OricKeys([string]$s) {
             $end = $s.IndexOf('}', $i)
             if ($end -gt $i) {
                 $token = $s.Substring($i + 1, $end - $i - 1).ToUpperInvariant()
+                if ($token.Length -eq 2 -and $token[0] -eq '^') {
+                    # Ctrl+letter: hold Control while tapping the letter VK.
+                    $vk = [byte][char]$token[1]
+                    [void][OricFocus]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
+                    Start-Sleep -Milliseconds 60
+                    [void][OricFocus]::keybd_event($vk, 0, 0, [UIntPtr]::Zero)
+                    Start-Sleep -Milliseconds 90
+                    [void][OricFocus]::keybd_event($vk, 0, [OricFocus]::KEYEVENTF_KEYUP, [UIntPtr]::Zero)
+                    Start-Sleep -Milliseconds 60
+                    [void][OricFocus]::keybd_event(0x11, 0, [OricFocus]::KEYEVENTF_KEYUP, [UIntPtr]::Zero)
+                    Start-Sleep -Milliseconds 120
+                    $i = $end + 1
+                    continue
+                }
                 $vk = switch ($token) {
                     'ENTER' { 0x0D } 'RETURN' { 0x0D } 'ESC' { 0x1B }
                     default { throw "unknown token {$token}" }
